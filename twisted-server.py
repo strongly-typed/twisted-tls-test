@@ -1,29 +1,53 @@
 #!/usr/bin/env python3
-from twisted.internet import ssl, reactor
-from twisted.internet.protocol import Factory, Protocol
+import sys
 
-from OpenSSL.SSL import TLSv1_2_METHOD
+from twisted.internet import ssl, protocol, task, defer, reactor
+from twisted.internet.endpoints import SSL4ServerEndpoint
 
-class Echo(Protocol):
+from OpenSSL import SSL, crypto
+
+from twisted.python import log
+
+
+class Echo(protocol.Protocol):
     def dataReceived(self, data):
         self.transport.write(data)
 
-if __name__ == '__main__':
+def main(reactor):
+    log.startLogging(sys.stdout)
 
-    myContextFactory = ssl.DefaultOpenSSLContextFactory(
-        privateKeyFileName='srv.key',
-        certificateFileName='srv.crt',
-        sslmethod=TLSv1_2_METHOD
+    with open('srv.crt') as certFile:
+        # serverCert = ssl.Certificate.loadPEM(certFile.read())
+        serverCert = crypto.load_certificate(type=crypto.FILETYPE_PEM, buffer=certFile.read())
+
+    with open('srv.key') as keyFile:
+        with open('srv.crt') as certFile:
+            # serverKey = ssl.PrivateCertificate.loadPEM(keyFile.read() + certFile.read())
+            serverKey = crypto.load_privatekey(type=crypto.FILETYPE_PEM, buffer=keyFile.read())
+
+    with open('ca.crt') as certFile:
+        caCert = ssl.Certificate.loadPEM(certFile.read())
+
+    cipherListString = 'ECDHE-RSA-AES128-GCM-SHA256'
+    acceptableCiphers = ssl.AcceptableCiphers.fromOpenSSLCipherString(cipherListString)
+
+    trustRoot = ssl.trustRootFromCertificates([caCert])
+    
+    options = ssl.CertificateOptions(
+        certificate=serverCert,
+        privateKey=serverKey,
+        trustRoot=trustRoot,
+        acceptableCiphers=acceptableCiphers,
+        method=SSL.TLSv1_2_METHOD
         )
 
-    ctx = myContextFactory.getContext()
+    factory = protocol.Factory.forProtocol(Echo)
 
-    ctx.set_cipher_list('ECDHE-RSA-AES128-GCM-SHA256')
+    endpoint = SSL4ServerEndpoint(reactor, 4443, options)
+    endpoint.listen(factory)
 
-    ctx.load_verify_locations("ca.crt")
-
-    factory = Factory()
-    factory.protocol = Echo
-
-    reactor.listenSSL(4443, factory, myContextFactory)
     reactor.run()
+    return defer.Deferred()
+
+if __name__ == '__main__':
+    task.react(main)

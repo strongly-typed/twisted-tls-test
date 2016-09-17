@@ -2,7 +2,7 @@ ECDHE_RSA_AES_128_GCM_SHA256: Twisted vs HTTPServer
 ===================================================
 
 Demonstrate that HTTPServer can successfully create connections with
-`ECDHE_RSA_AES_128_GCM_SHA256`, while Twisted cannot.
+`ECDHE_RSA_AES_128_GCM_SHA256` and Twisted can, too.
 
 
 Prepare
@@ -75,16 +75,28 @@ With `twisted` the handshake is aborted:
     
 The result is:
 
-    * Rebuilt URL to: https://localhost:4443/
-    *   Trying 127.0.0.1...
-    * Connected to localhost (127.0.0.1) port 4443 (#0)
-    * found 1 certificates in ca.crt
-    * found 697 certificates in /etc/ssl/certs
-    * ALPN, offering http/1.1
-    * gnutls_handshake() failed: Handshake failed
-    * Closing connection 0
-    curl: (35) gnutls_handshake() failed: Handshake failed
+    [...]
+    New, TLSv1/SSLv3, Cipher is ECDHE-RSA-AES128-GCM-SHA256
+    Server public key is 2048 bit
+    Secure Renegotiation IS supported
+    Compression: NONE
+    Expansion: NONE
+    No ALPN negotiated
+    SSL-Session:
+        Protocol  : TLSv1.2
+        Cipher    : ECDHE-RSA-AES128-GCM-SHA256
+    [...]
 
+which cannot be achived with `ssl.DefaultOpenSSLContextFactory`, only with `ssl.CertificateOptions` and `SSL4ServerEndpoint`.
+
+Try all available Ciphers
+=========================
+
+To check for all ciphers your openssl provides, just run
+
+    ./cipher_test.sh
+
+against your server.
 
 Versions
 ========
